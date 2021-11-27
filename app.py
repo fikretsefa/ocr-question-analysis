@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Oct 20 09:12:46 2021
-
-@author: yusuf
-"""
-
 import cv2
 import os
 from PIL import Image
@@ -29,11 +22,12 @@ import string
 import xlwt
 from xlwt import Workbook
 
-#for test
+#for performance
 import time
 
 
-print("===STARTED=== \n")
+
+print("===Process Started=== \n")
 
 original_text = "14. Bir toplantıda herkes birbiriyle tokalaşmıştır. Toplam 66 tokalaşma olduğuna göre, toplantıda kaç kişi vardır? A) 8 B) 9 C) 10 D) 11 E) 12"
 
@@ -68,15 +62,26 @@ if not(isExistResultFile):
 #Excel Workbook
 wb = Workbook()
 sheet = wb.add_sheet(result_file_name)
-sheet.write(0, 0, 'Path')
-sheet.write(0, 1, 'Name')
-sheet.write(0, 2, 'Orijinal Text')
-sheet.write(0, 3, 'Tesseract')
-sheet.write(0, 4, 'Tesseract and TNLP')
-sheet.write(0, 5, 'Easyocr')
-sheet.write(0, 6, 'Accuracy')
-sheet.write(0, 7, 'Quality')
-wb.save(os.path.join(result_file_path, excel_file_name))
+#Header
+header_style = xlwt.easyxf('font: bold 1, color red;')
+sheet.write(0, 0, 'Input',header_style)
+header_style = xlwt.easyxf('font: bold 1, color green;')
+sheet.write(0, 5, 'Output',header_style)
+header_style = xlwt.easyxf('font: bold 1, color blue;')
+sheet.write(0, 10, 'Result',header_style)
+#Input
+sheet.write(1, 0, 'Name')
+sheet.write(1, 1, 'Path')
+sheet.write(1, 2, 'Size')
+sheet.write(1, 3, 'Text')
+#Output
+sheet.write(1, 5, 'Name')
+sheet.write(1, 6, 'Path')
+sheet.write(1, 7, 'Size')
+sheet.write(1, 8, 'Text')
+#Result
+sheet.write(1, 10, 'Similarty')
+sheet.write(1, 11, 'Process Time')
 
 
 
@@ -84,32 +89,23 @@ image_path_array = glob.glob(os.path.join(images_file_path, image_format))
 
 pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
-#punctuation boşluk temizler ve noktalama işareti ekler.
-#boto3 noktalamalara dikkat eder.
-#cümle sonlarında nokta var ise doğruluk oranı artar.
 def punctuation(input_text):
     line = input_text.strip('\n')
     line = line.strip('\t')
-    # removeWhiteSpace = re.sub(' +', ' ', res)
-    # removeLastWhiteSpace = removeWhiteSpace.rstrip();
-    # return removeLastWhiteSpace
     return line
 
-#Tesseract OCR
-def ConvertOCR(path,lang):
-    return pytesseract.image_to_string(Image.open(path), lang=lang)
-
-#Tesseract OCR
+#EasyOCR
 def EasyOCR(path,lang):
-    reader = easyocr.Reader(['tr'], gpu=True)
+    reader = easyocr.Reader(['tr'], gpu=False)
     easy_ocr = reader.readtext(Image.open(path),paragraph="False", detail=0)
     return easy_ocr
-
 
 #Image Quality Saver
 def ImageQuality(path,quality):
     temp_quality_image = Image.open(path)
-    temp_quality_image.save(os.path.join(result_file_path, os.path.basename(path))  , quality=quality)
+    new_path = os.path.join(result_file_path, os.path.basename(path))
+    temp_quality_image.save(os.path.join(result_file_path, os.path.basename(path)),quality=quality)
+    return new_path
 
 #Compare Similarty
 def CompareSimilarty(original,test):
@@ -120,81 +116,58 @@ def show(header,img):
     cv2.imshow(header,img)
     cv2.waitKey(0)
 
+#Console Write
+def output(header,inner):
+    print(header)
+    print(inner)
+    print("\n")
+   
 
 
-
+idx = 1
 for path in image_path_array:
     
-  
-    #test = cv2.imread(path,0)
-    test = cv2.imread(path)
-    # cv2.imshow('image',test)
-    # cv2.waitKey(0)
-    print("original_text :",original_text)
-    print("================================")
+    idx = idx + 1   
 
-    converted_text = ConvertOCR(path,"tur")
-    print("converted_text :",converted_text)
-    print("================================")
+    output("Original Text",original_text)
 
-    punch_text = punctuation(converted_text)
-    print("punch_text:",punch_text)
-    print("================================")
-
-    compared_ratio = CompareSimilarty(original_text,punch_text)
-    print("Tesseract Similarty:",compared_ratio)
-
+    #Process started
+    start_time = time.time()
 
     converted_text = EasyOCR(path,"tr")
-  
-
     result_st = ""
     for index in converted_text:
         result_st = result_st + index + " "
 
-    print("converted_EASY_text :", result_st)
-    compared_ratio = CompareSimilarty(original_text,result_st)
-    print("EasyOCR Similarty:",compared_ratio)
+    punch_text = punctuation(result_st)
+    output("Punch Text",punch_text)
+    #Process ending
+    end_time = time.time()
 
-
-    #IMAGE PROCESS
-    #gray = cv2.cvtColor(test, cv2.COLOR_BGR2GRAY)
-    #show("gray",gray)
-    # blur = cv2.GaussianBlur(gray, (3, 3), cv2.BORDER_DEFAULT)
-    # show("blur",blur)
-    # filtered = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 41,27)
-    # kernel = np.ones((1, 1), np.uint8)
-    # opening = cv2.morphologyEx(filtered, cv2.MORPH_OPEN, kernel)
-    # closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, kernel)   
-    # ret1, th1 = cv2.threshold(closing, 100, 255, cv2.THRESH_BINARY)
-    # ret2, th2 = cv2.threshold(th1, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)   
-    # blur = cv2.GaussianBlur(th2, (11, 5), cv2.BORDER_DEFAULT)
-    # ret3, th3 = cv2.threshold(th2, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    # or_image = cv2.bitwise_or(th3, closing)
-    #temp =  cv2.addWeighted(test,1.5,test,-0.5,0,test)
-    #kaydet
-    # saved = temp
-    # cv2.imwrite(os.path.join(result_file_path, os.path.basename(path)),saved)
-    # converted_text = ConvertOCR(os.path.join(result_file_path, os.path.basename(path)),"tur")
-    # print(converted_text)
-    # compared_ratio = CompareSimilarty(original_text,converted_text)
-    # print(compared_ratio)    
-    # cv2.imshow('image',saved)
-    # cv2.waitKey(0)
+    compared_ratio = CompareSimilarty(original_text,punch_text)
+    output("Similarty Result",compared_ratio)
     
-    
-    
-    ImageQuality(path,60)
+    new_image_path = ImageQuality(path,60)
+
+
+    sheet.write(idx, 0, os.path.basename(path))
+    sheet.write(idx, 1, path)
+    sheet.write(idx, 2, os.path.getsize(path))
+    sheet.write(idx, 3, original_text)
+    sheet.write(idx, 5, os.path.basename(new_image_path))
+    sheet.write(idx, 6, new_image_path)
+    sheet.write(idx, 7, os.path.getsize(new_image_path))
+    sheet.write(idx, 8, punch_text)
+    sheet.write(idx, 10, compared_ratio)
+    sheet.write(idx, 11, format(end_time-start_time, '.2f'))
 
 
 
+wb.save(os.path.join(result_file_path, excel_file_name))
 
 
 
-
-
-
-print("\n ===DONE===")
+print("\n ===Process Done===")
 
 # #time using for performance test
 # print("Process Starting")
